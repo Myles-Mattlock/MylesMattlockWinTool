@@ -19,6 +19,14 @@ $script:Root = Split-Path -Parent $PSCommandPath
 $script:BrushConverter = [System.Windows.Media.BrushConverter]::new()
 $script:AppVersion = '1.0.0'
 
+# Color Constants (shared with CleanUp.ps1 drive status cards)
+$HexGreen = "#4ADE80"
+$HexAmber = "#FACC15"
+$HexRed   = "#F87171"
+$HexWhite = "#FFFFFF"
+$HexMuted = "#888888"
+$Global:InfoDriveUIMap = @{}
+
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -168,7 +176,7 @@ $script:AppVersion = '1.0.0'
 
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
-@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallOffice','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
+@('HeaderVersion','HeaderLogo','MainTabs','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallOffice','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
     Set-Variable -Name $_ -Value $window.FindName($_)
 }
 
@@ -255,68 +263,221 @@ function Get-InfoSmartctlData([int]$DiskIndex) {
     return $null
 }
 
+function Add-InfoDriveRowUI ($DriveLetter, $InitialFreeText) {
+    $Grid = New-Object System.Windows.Controls.Grid
+    $Grid.Margin = New-Object System.Windows.Thickness(0, 0, 0, 8)
+
+    0..5 | ForEach-Object {
+        $col = New-Object System.Windows.Controls.ColumnDefinition
+        $col.Width = [System.Windows.GridLength]::new(1.0, [System.Windows.GridUnitType]::Star)
+        [void]$Grid.ColumnDefinitions.Add($col)
+        if ($_ -lt 5) {
+            $spaceCol = New-Object System.Windows.Controls.ColumnDefinition
+            $spaceCol.Width = [System.Windows.GridLength]::new(8, [System.Windows.GridUnitType]::Pixel)
+            [void]$Grid.ColumnDefinitions.Add($spaceCol)
+        }
+    }
+
+    function Create-Card ($Title, $ValText, $FgHex, $ColIdx) {
+        $Border = New-Object System.Windows.Controls.Border
+        $Border.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString("#2D2D30")
+        $Border.CornerRadius = New-Object System.Windows.CornerRadius(6)
+        $Border.Padding = New-Object System.Windows.Thickness(8, 10, 8, 10)
+        [System.Windows.Controls.Grid]::SetColumn($Border, $ColIdx)
+
+        $Stack = New-Object System.Windows.Controls.StackPanel
+        $TTitle = New-Object System.Windows.Controls.TextBlock
+        $TTitle.Text = $Title; $TTitle.FontSize = 10; $TTitle.FontWeight = [System.Windows.FontWeights]::Bold
+        $TTitle.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString("#888888")
+
+        $TVal = New-Object System.Windows.Controls.TextBlock
+        $TVal.Text = $ValText; $TVal.FontSize = 14; $TVal.FontWeight = [System.Windows.FontWeights]::Bold
+        $TVal.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString($FgHex)
+        $TVal.Margin = New-Object System.Windows.Thickness(0, 4, 0, 0)
+
+        [void]$Stack.Children.Add($TTitle)
+        [void]$Stack.Children.Add($TVal)
+        $Border.Child = $Stack
+        return @{ Border = $Border; Text = $TVal }
+    }
+
+    $CardSpace    = Create-Card "DRIVE SPACE ($DriveLetter)" $InitialFreeText $HexWhite 0
+    $CardHealth   = Create-Card "HEALTH" "Loading..." $HexMuted 2
+    $CardTemp     = Create-Card "TEMP" "Loading..." $HexMuted 4
+    $CardHours    = Create-Card "POWER HOURS" "Loading..." $HexMuted 6
+    $CardCycles   = Create-Card "POWER CYCLES" "Loading..." $HexMuted 8
+    $CardShutdown = Create-Card "UNSAFE SHUTDOWN" "Loading..." $HexMuted 10
+
+    [void]$Grid.Children.Add($CardSpace.Border)
+    [void]$Grid.Children.Add($CardHealth.Border)
+    [void]$Grid.Children.Add($CardTemp.Border)
+    [void]$Grid.Children.Add($CardHours.Border)
+    [void]$Grid.Children.Add($CardCycles.Border)
+    [void]$Grid.Children.Add($CardShutdown.Border)
+
+    [void]$InfoDriveStatus.Children.Add($Grid)
+    $Global:InfoDriveUIMap[$DriveLetter] = @{ 
+        Health = $CardHealth.Text
+        Temp   = $CardTemp.Text
+        Hours  = $CardHours.Text
+        Cycles = $CardCycles.Text
+        Unsafe = $CardShutdown.Text
+    }
+}
+
+function Update-InfoDriveHealthAndTemp {
+    try {
+        $PhysicalDisks = Get-PhysicalDisk -ErrorAction SilentlyContinue
+        foreach ($Disk in $PhysicalDisks) {
+            $TempStr = "N/A"; $TempHex = $HexGreen
+            $HealthStr = "Healthy"; $HealthHex = $HexGreen
+            $HoursStr = "N/A"
+            $CyclesStr = "N/A"
+            $UnsafeStr = "N/A"
+
+            $StorageStats = $Disk | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue
+            if ($StorageStats -and $StorageStats.Temperature) {
+                $RawTemp = [int]$StorageStats.Temperature
+                $TempStr = "$RawTemp °C"
+                if ($RawTemp -ge 70) {
+                    $TempHex = $HexRed
+                } elseif ($RawTemp -ge 50) {
+                    $TempHex = $HexAmber
+                } else {
+                    $TempHex = $HexGreen
+                }
+            }
+
+            $Json = Get-InfoSmartctlData -DiskIndex $Disk.DeviceId
+            if ($Json) {
+                if ($TempStr -eq "N/A") {
+                    $RawTemp = $null
+                    if ($Json.temperature.current) {
+                        $RawTemp = [int]$Json.temperature.current
+                    } elseif ($Json.nvme_smart_health_information_log.temperature) {
+                        $RawTemp = [int]$Json.nvme_smart_health_information_log.temperature
+                    }
+
+                    if ($null -ne $RawTemp) {
+                        $TempStr = "$RawTemp °C"
+                        if ($RawTemp -ge 70) {
+                            $TempHex = $HexRed
+                        } elseif ($RawTemp -ge 50) {
+                            $TempHex = $HexAmber
+                        } else {
+                            $TempHex = $HexGreen
+                        }
+                    }
+                }
+
+                if ($null -ne $Json.nvme_smart_health_information_log.percentage_used) {
+                    $Used = [int]$Json.nvme_smart_health_information_log.percentage_used
+                    $HealthVal = 100 - $Used
+                    $HealthStr = "$HealthVal% Health"
+
+                    if ($HealthVal -lt 70) { $HealthHex = $HexRed }
+                    elseif ($HealthVal -lt 90) { $HealthHex = $HexAmber }
+                    else { $HealthHex = $HexGreen }
+                } elseif ($Json.smart_status.passed -eq $true) {
+                    $HealthStr = "100% Health"
+                    $HealthHex = $HexGreen
+                }
+
+                if ($Json.power_on_time.hours) {
+                    $HoursStr = "$($Json.power_on_time.hours) hrs"
+                } elseif ($Json.nvme_smart_health_information_log.power_on_hours) {
+                    $HoursStr = "$($Json.nvme_smart_health_information_log.power_on_hours) hrs"
+                }
+
+                if ($Json.power_cycle_count) {
+                    $CyclesStr = "$($Json.power_cycle_count)"
+                } elseif ($Json.nvme_smart_health_information_log.power_cycles) {
+                    $CyclesStr = "$($Json.nvme_smart_health_information_log.power_cycles)"
+                }
+
+                $RawUnsafe = $null
+                if ($null -ne $Json.nvme_smart_health_information_log.unsafe_shutdowns) {
+                    $RawUnsafe = [int]$Json.nvme_smart_health_information_log.unsafe_shutdowns
+                } else {
+                    $Attr = $Json.ata_smart_attributes.table | Where-Object { $_.id -eq 192 -or $_.name -like "*Unsafe_Shutdown*" }
+                    if ($Attr) { $RawUnsafe = [int]$Attr.raw.value }
+                }
+
+                if ($null -ne $RawUnsafe) { $UnsafeStr = "$RawUnsafe" }
+            } elseif ($Disk.HealthStatus) {
+                $HealthStr = $Disk.HealthStatus
+            }
+
+            $DiskObj = Get-Disk | Where-Object { $_.Number -eq $Disk.DeviceId -or $_.UniqueId -eq $Disk.UniqueId } -ErrorAction SilentlyContinue
+            if ($DiskObj) {
+                $Partitions = $DiskObj | Get-Partition -ErrorAction SilentlyContinue
+                foreach ($Part in $Partitions) {
+                    if ($Part.DriveLetter) {
+                        $Key = "$($Part.DriveLetter):"
+                        if ($Global:InfoDriveUIMap.ContainsKey($Key)) {
+                            $Global:InfoDriveUIMap[$Key].Health.Text       = $HealthStr
+                            $Global:InfoDriveUIMap[$Key].Health.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString($HealthHex)
+                            $Global:InfoDriveUIMap[$Key].Temp.Text         = $TempStr
+                            $Global:InfoDriveUIMap[$Key].Temp.Foreground   = [System.Windows.Media.BrushConverter]::new().ConvertFromString($TempHex)
+                            $Global:InfoDriveUIMap[$Key].Hours.Text        = $HoursStr
+                            $Global:InfoDriveUIMap[$Key].Hours.Foreground  = [System.Windows.Media.BrushConverter]::new().ConvertFromString($HexWhite)
+                            $Global:InfoDriveUIMap[$Key].Cycles.Text       = $CyclesStr
+                            $Global:InfoDriveUIMap[$Key].Cycles.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString($HexWhite)
+                            $Global:InfoDriveUIMap[$Key].Unsafe.Text       = $UnsafeStr
+                            $Global:InfoDriveUIMap[$Key].Unsafe.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString($HexWhite)
+                        }
+                    }
+                }
+            }
+        }
+    } catch {
+        Write-Log "Info drive refresh failed: $($_.Exception.Message)"
+    }
+}
+
 function Update-InfoPage {
+    $InfoWindowsLoading.Visibility = 'Visible'
+    $InfoDriveLoading.Visibility = 'Visible'
     try {
         $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
         $displayVersion = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue).DisplayVersion
         $version = if ($displayVersion) { $displayVersion } else { $os.Version }
         $InfoWindowsVersion.Text = "$($os.Caption) $version (Build $($os.BuildNumber))"
-    } catch { $InfoWindowsVersion.Text = 'Unable to read Windows version.' }
-    $InfoWindowsLoading.Visibility = 'Collapsed'
+    } catch {
+        $InfoWindowsVersion.Text = 'Unable to read Windows version.'
+        Write-Log "Info page Windows version failed: $($_.Exception.Message)"
+    } finally {
+        $InfoWindowsLoading.Visibility = 'Collapsed'
+    }
 
-    $InfoDriveLoading.Visibility = 'Visible'
     $InfoDriveStatus.Children.Clear()
     try {
-        $physicalDisks = @(Get-PhysicalDisk -ErrorAction SilentlyContinue)
-        $fixedDrives = @([System.IO.DriveInfo]::GetDrives() | Where-Object { $_.DriveType -eq 'Fixed' -and $_.IsReady })
+        $Global:InfoDriveUIMap = @{}
+        $fixedDrives = @([System.IO.DriveInfo]::GetDrives() | Where-Object { $_.DriveType -eq 'Fixed' -and $_.IsReady }) | Select-Object -First 3
         foreach ($drive in $fixedDrives) {
-            $disk = $null
-            try {
-                $partition = Get-Partition -DriveLetter $drive.Name.Substring(0, 1) -ErrorAction SilentlyContinue
-                if ($partition) { $disk = $physicalDisks | Where-Object { $_.DeviceId -eq $partition.DiskNumber } | Select-Object -First 1 }
-            } catch {}
-
-            $health = 'N/A'
-            $healthColor = '#888888'
-            if ($disk) {
-                $json = Get-InfoSmartctlData -DiskIndex $disk.DeviceId
-                if ($json -and $null -ne $json.nvme_smart_health_information_log.percentage_used) {
-                    $healthValue = 100 - [int]$json.nvme_smart_health_information_log.percentage_used
-                    $health = "$healthValue% Health"
-                    $healthColor = if ($healthValue -lt 70) { '#F87171' } elseif ($healthValue -lt 90) { '#FACC15' } else { '#4ADE80' }
-                } elseif ($json -and $json.smart_status.passed -eq $true) {
-                    $health = '100% Health'; $healthColor = '#4ADE80'
-                } elseif ($disk.HealthStatus) {
-                    $health = [string]$disk.HealthStatus
-                    $healthColor = if ($health -eq 'Healthy') { '#4ADE80' } else { '#FACC15' }
-                }
-            }
-
-            $row = New-Object System.Windows.Controls.Grid
-            $row.Background = '#2D2D30'; $row.Padding = New-Object System.Windows.Thickness(12, 10, 12, 10); $row.Margin = New-Object System.Windows.Thickness(0, 0, 0, 8)
-            $label = New-Object System.Windows.Controls.TextBlock
-                $label.Text = "$($drive.Name.TrimEnd('\'))  ($([math]::Round($drive.TotalSize / 1GB, 1)) GB)"; $label.Foreground = '#FFFFFF'; $label.FontSize = 14; $label.VerticalAlignment = 'Center'
-            $status = New-Object System.Windows.Controls.TextBlock
-            $status.Text = $health; $status.Foreground = $healthColor; $status.FontWeight = 'Bold'; $status.FontSize = 14; $status.HorizontalAlignment = 'Right'; $status.VerticalAlignment = 'Center'
-            [void]$row.Children.Add($label); [void]$row.Children.Add($status)
-            [void]$InfoDriveStatus.Children.Add($row)
+            $letter = $drive.Name.TrimEnd('\')
+            $freeGB = "$([Math]::Round($drive.AvailableFreeSpace / 1GB, 2)) GB"
+            Add-InfoDriveRowUI -DriveLetter $letter -InitialFreeText $freeGB
         }
         if ($fixedDrives.Count -eq 0) { $InfoDriveStatus.Children.Add((New-Object System.Windows.Controls.TextBlock -Property @{ Text = 'No fixed drives found.'; Foreground = '#888888' })) }
     } catch {
+        Write-Log "Info page drive layout failed: $($_.Exception.Message)"
+        $InfoDriveStatus.Children.Add((New-Object System.Windows.Controls.TextBlock -Property @{ Text = 'Unable to read drive status.'; Foreground = '#FACC15' }))
         $fixedDrives = @([System.IO.DriveInfo]::GetDrives() | Where-Object { $_.DriveType -eq 'Fixed' -and $_.IsReady })
         foreach ($drive in $fixedDrives) {
-            $row = New-Object System.Windows.Controls.Grid
-            $row.Background = '#2D2D30'; $row.Padding = New-Object System.Windows.Thickness(12, 10, 12, 10); $row.Margin = New-Object System.Windows.Thickness(0, 0, 0, 8)
-            $label = New-Object System.Windows.Controls.TextBlock
-            $label.Text = "$($drive.Name.TrimEnd('\'))  ($([math]::Round($drive.TotalSize / 1GB, 1)) GB)"; $label.Foreground = '#FFFFFF'; $label.FontSize = 14
-            $status = New-Object System.Windows.Controls.TextBlock
-            $status.Text = 'N/A'; $status.Foreground = '#888888'; $status.FontWeight = 'Bold'; $status.FontSize = 14; $status.HorizontalAlignment = 'Right'
-            [void]$row.Children.Add($label); [void]$row.Children.Add($status)
-            [void]$InfoDriveStatus.Children.Add($row)
+            $letter = $drive.Name.TrimEnd('\')
+            $freeGB = "$([Math]::Round($drive.AvailableFreeSpace / 1GB, 2)) GB"
+            Add-InfoDriveRowUI -DriveLetter $letter -InitialFreeText $freeGB
         }
         if ($fixedDrives.Count -eq 0) { $InfoDriveStatus.Children.Add((New-Object System.Windows.Controls.TextBlock -Property @{ Text = 'No fixed drives found.'; Foreground = '#888888' })) }
+    } finally {
+        $InfoDriveLoading.Visibility = 'Collapsed'
+        try {
+            Update-InfoDriveHealthAndTemp
+        } catch {
+            Write-Log "Info page drive refresh failed: $($_.Exception.Message)"
+        }
     }
-    $InfoDriveLoading.Visibility = 'Collapsed'
 }
 
 function Start-AppOperation([string]$Action) {
@@ -652,8 +813,8 @@ $startupTimer = New-Object System.Windows.Threading.DispatcherTimer
 $startupTimer.Interval = [TimeSpan]::FromMilliseconds(100)
 $startupTimer.Add_Tick({
     $this.Stop()
-    Initialize-AppItems
-    Update-InfoPage
-}.GetNewClosure())
+    & (Get-Command Initialize-AppItems)
+    & (Get-Command Update-InfoPage)
+})
 $startupTimer.Start()
 $window.ShowDialog() | Out-Null
