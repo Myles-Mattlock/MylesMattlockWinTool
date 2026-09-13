@@ -33,3 +33,27 @@ jobs:
       with:
         name: MylesMattlockWinTool-Exe
         path: MylesMattlockWinTool.exe
+
+  create_release:
+    name: Create Release
+    needs: windows_installer_build
+    if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Download executable artifact
+      uses: actions/download-artifact@v8.0.1
+      with:
+        name: MylesMattlockWinTool-Exe
+
+    - name: Create GitHub release
+      uses: softprops/action-gh-release@v3.0.2
+      with:
+        tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'beta-latest' }}
+        files: MylesMattlockWinTool.exe
+        draft: false
+        prerelease: ${{ github.ref == 'refs/heads/main' || contains(github.ref_name, '-') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
