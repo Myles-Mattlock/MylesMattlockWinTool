@@ -1,10 +1,21 @@
 #requires -Version 5.1
 
+function Get-HostExecutablePath {
+    if ($PSCommandPath) { return $PSCommandPath }
+    if ($MyInvocation.MyCommand.Path) { return $MyInvocation.MyCommand.Path }
+    return [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+}
+
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator
 )
 if (-not $isAdmin) {
-    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs -WindowStyle Hidden
+    $hostPath = Get-HostExecutablePath
+    if ($hostPath -like '*.exe') {
+        Start-Process -FilePath $hostPath -Verb RunAs -WindowStyle Hidden
+    } else {
+        Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$hostPath`"" -Verb RunAs -WindowStyle Hidden
+    }
     exit
 }
 
@@ -15,7 +26,7 @@ Add-Type -MemberDefinition @"
     public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 "@ -Name "DwmApi" -Namespace "Win32" | Out-Null
 
-$script:Root = Split-Path -Parent $PSCommandPath
+$script:Root = Split-Path -Parent (Get-HostExecutablePath)
 $script:BrushConverter = [System.Windows.Media.BrushConverter]::new()
 $script:AppVersion = '1.0.0'
 
