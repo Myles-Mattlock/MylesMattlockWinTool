@@ -26,7 +26,7 @@ jobs:
     - name: Build executable
       run: |
         $outputPath = Join-Path $env:GITHUB_WORKSPACE 'MylesMattlockWinTool.exe'
-        ps2exe -InputFile "MylesMattlockWinTool.ps1" -OutputFile $outputPath -IconFile "MM.ico" -version '1.0.0'
+        ps2exe -InputFile "MylesMattlockWinTool.ps1" -OutputFile $outputPath -IconFile "MM.ico" -version '1.0.0' -verbose
         if (-not (Test-Path -LiteralPath $outputPath)) { throw "Build output not found: $outputPath" }
       shell: pwsh
 
