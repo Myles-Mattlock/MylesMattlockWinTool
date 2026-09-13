@@ -25,14 +25,16 @@ jobs:
 
     - name: Build executable
       run: |
-        ps2exe -InputFile "MylesMattlockWinTool.ps1" -OutputFile "MylesMattlockWinTool.exe" -IconFile "MM.ico" -version '1.0.0'
+        $outputPath = Join-Path $env:GITHUB_WORKSPACE 'MylesMattlockWinTool.exe'
+        ps2exe -InputFile "MylesMattlockWinTool.ps1" -OutputFile $outputPath -IconFile "MM.ico" -version '1.0.0'
+        if (-not (Test-Path -LiteralPath $outputPath)) { throw "Build output not found: $outputPath" }
       shell: pwsh
 
     - name: Upload executable artifact
       uses: actions/upload-artifact@v7.0.1
       with:
         name: MylesMattlockWinTool-Exe
-        path: MylesMattlockWinTool.exe
+        path: ${{ github.workspace }}/MylesMattlockWinTool.exe
 
   create_release:
     name: Create Release
@@ -47,12 +49,13 @@ jobs:
       uses: actions/download-artifact@v8.0.1
       with:
         name: MylesMattlockWinTool-Exe
+        path: release-artifact
 
     - name: Create GitHub release
       uses: softprops/action-gh-release@v3.0.2
       with:
         tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'beta-latest' }}
-        files: MylesMattlockWinTool.exe
+        files: release-artifact/MylesMattlockWinTool.exe
         draft: false
         prerelease: ${{ github.ref == 'refs/heads/main' || contains(github.ref_name, '-') }}
       env:
