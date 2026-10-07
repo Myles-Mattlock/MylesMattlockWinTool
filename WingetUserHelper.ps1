@@ -7,12 +7,19 @@ param(
 
 try {
     Set-Content -LiteralPath $OutputPath -Value '' -Encoding UTF8
+    $wingetPath = (Get-Command 'winget.exe' -ErrorAction SilentlyContinue).Source
+    if (-not $wingetPath) {
+        $wingetPath = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe'
+    }
+    if (-not (Test-Path -LiteralPath $wingetPath)) {
+        throw 'Could not locate winget.exe for the current user.'
+    }
     if ($Action -eq 'install') {
-        & winget.exe install --id $PackageId --exact --scope user --accept-source-agreements --accept-package-agreements 2>&1 | ForEach-Object {
+        & $wingetPath install --id $PackageId --exact --accept-source-agreements --accept-package-agreements 2>&1 | ForEach-Object {
             Add-Content -LiteralPath $OutputPath -Value ([string]$_) -Encoding UTF8
         }
     } else {
-        & winget.exe uninstall --id $PackageId --exact --scope user --accept-source-agreements 2>&1 | ForEach-Object {
+        & $wingetPath uninstall --id $PackageId --exact --accept-source-agreements 2>&1 | ForEach-Object {
             Add-Content -LiteralPath $OutputPath -Value ([string]$_) -Encoding UTF8
         }
     }

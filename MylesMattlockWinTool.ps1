@@ -1,6 +1,6 @@
 #requires -Version 5.1
 
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator
 )
 if (-not $isAdmin) {
@@ -14,6 +14,79 @@ Add-Type -MemberDefinition @"
     [DllImport("dwmapi.dll")]
     public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 "@ -Name "DwmApi" -Namespace "Win32" | Out-Null
+
+Add-Type @"
+using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
+namespace Win32 {
+    public static class UnelevatedProcess {
+        [DllImport("advapi32.dll", SetLastError = true)]
+        static extern bool OpenProcessToken(IntPtr processHandle, uint desiredAccess, out IntPtr tokenHandle);
+        [DllImport("advapi32.dll", SetLastError = true)]
+        static extern bool DuplicateTokenEx(IntPtr existingToken, uint desiredAccess, IntPtr tokenAttributes, int impersonationLevel, int tokenType, out IntPtr token);
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool CreateProcessWithTokenW(IntPtr token, uint logonFlags, string applicationName, string commandLine, uint creationFlags, IntPtr environment, string currentDirectory, ref StartupInfo startupInfo, out ProcessInfo processInfo);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool CloseHandle(IntPtr handle);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        struct StartupInfo {
+            public int cb;
+            public string reserved;
+            public string desktop;
+            public string title;
+            public int x;
+            public int y;
+            public int xSize;
+            public int ySize;
+            public int xCount;
+            public int yCount;
+            public int fill;
+            public int flags;
+            public short show;
+            public short reserved2;
+            public IntPtr reserved3;
+            public IntPtr standardInput;
+            public IntPtr standardOutput;
+            public IntPtr standardError;
+        }
+        [StructLayout(LayoutKind.Sequential)]
+        struct ProcessInfo {
+            public IntPtr process;
+            public IntPtr thread;
+            public int processId;
+            public int threadId;
+        }
+
+        public static int Start(string commandLine) {
+            Process explorer = null;
+            IntPtr sourceToken = IntPtr.Zero;
+            IntPtr primaryToken = IntPtr.Zero;
+            try {
+                explorer = Process.GetProcessesByName("explorer")[0];
+                if (!OpenProcessToken(explorer.Handle, 0x000A, out sourceToken))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                if (!DuplicateTokenEx(sourceToken, 0x02000000, IntPtr.Zero, 2, 1, out primaryToken))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                var startup = new StartupInfo { cb = Marshal.SizeOf(typeof(StartupInfo)), desktop = "winsta0\\default", show = 0 };
+                ProcessInfo info;
+                if (!CreateProcessWithTokenW(primaryToken, 0, null, commandLine, 0x08000000, IntPtr.Zero, null, ref startup, out info))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                CloseHandle(info.thread);
+                CloseHandle(info.process);
+                return info.processId;
+            } finally {
+                if (primaryToken != IntPtr.Zero) CloseHandle(primaryToken);
+                if (sourceToken != IntPtr.Zero) CloseHandle(sourceToken);
+                if (explorer != null) explorer.Dispose();
+            }
+        }
+    }
+}
+"@
 
 $script:Root = Split-Path -Parent $PSCommandPath
 $script:BrushConverter = [System.Windows.Media.BrushConverter]::new()
@@ -91,7 +164,7 @@ $script:AppVersion = '1.0.0'
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
-            <TabItem Header="Install / Remove Apps">
+            <TabItem x:Name="InstallTab" Header="Install / Remove Apps">
                 <ScrollViewer Padding="20" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <TextBlock Text="App Library" Foreground="#00A8E8" FontWeight="Bold" FontSize="12" Margin="0,0,0,14"/>
@@ -106,7 +179,6 @@ $script:AppVersion = '1.0.0'
                             <CheckBox x:Name="InstallJabra" Content="Jabra Direct"/>
                             <CheckBox x:Name="Install7zip" Content="7-Zip"/>
                             <CheckBox x:Name="InstallVscode" Content="Visual Studio Code"/>
-                            <CheckBox x:Name="InstallOffice" Content="Microsoft 365"/>
                             <CheckBox x:Name="InstallHwmonitor" Content="HWMonitor"/>
                             <CheckBox x:Name="InstallNotepadPlus" Content="Notepad++"/>
                             <CheckBox x:Name="InstallPostman" Content="Postman"/>
@@ -168,7 +240,7 @@ $script:AppVersion = '1.0.0'
 
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
-@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallOffice','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
+@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
     Set-Variable -Name $_ -Value $window.FindName($_)
 }
 
@@ -217,7 +289,6 @@ function Get-AppItems {
         @{ Check = $InstallJabra; Id = 'Jabra.Direct'; Name = 'Jabra Direct' },
         @{ Check = $Install7zip; Id = '7zip.7zip'; Name = '7-Zip' },
         @{ Check = $InstallVscode; Id = 'Microsoft.VisualStudioCode'; Name = 'Visual Studio Code' },
-        @{ Check = $InstallOffice; Id = 'Microsoft.Office'; Name = 'Microsoft 365' },
         @{ Check = $InstallHwmonitor; Id = 'CPUID.HWMonitor'; Name = 'HWMonitor' },
         @{ Check = $InstallNotepadPlus; Id = 'Notepad++.Notepad++'; Name = 'Notepad++' },
         @{ Check = $InstallPostman; Id = 'Postman.Postman'; Name = 'Postman' },
@@ -228,16 +299,65 @@ function Get-AppItems {
 }
 
 $appItems = @(Get-AppItems)
+$script:AppItemsInitialized = $false
 function Initialize-AppItems {
+    if ($script:AppItemsInitialized) { return }
+    $installedPackages = ''
+    try {
+        $installedPackages = & winget.exe list --accept-source-agreements --disable-interactivity 2>$null | Out-String
+    } catch {}
     foreach ($item in $appItems) {
-        try {
-            $item.Installed = (& winget.exe list --id $item.Id --exact --accept-source-agreements 2>$null | Out-String) -match [regex]::Escape($item.Id)
-        } catch { $item.Installed = $false }
-        if ($item.Installed) {
-            $item.Check.Content = "$($item.Name) (installed)"
-        }
+        $item.Installed = $installedPackages -match "(?im)(^|\s)$([regex]::Escape($item.Id))(\s|$)"
+        $item.Check.Content = if ($item.Installed) { "$($item.Name) (installed)" } else { $item.Name }
         $item.Check.IsChecked = $false
     }
+    $script:AppItemsInitialized = $true
+}
+
+function Initialize-AppItemsWithLoading {
+    if ($script:AppItemsInitialized) { return }
+    $loadingWindow = New-Object System.Windows.Window
+    $loadingWindow.Title = 'Myles Mattlock WinTool'
+    $loadingWindow.Owner = $window
+    $loadingWindow.WindowStartupLocation = 'CenterOwner'
+    $loadingWindow.WindowStyle = 'ToolWindow'
+    $loadingWindow.ResizeMode = 'NoResize'
+    $loadingWindow.SizeToContent = 'WidthAndHeight'
+    $panel = New-Object System.Windows.Controls.StackPanel
+    $panel.Margin = New-Object System.Windows.Thickness(28, 20, 28, 20)
+    $label = New-Object System.Windows.Controls.TextBlock -Property @{ Text = 'Loading installed app status...'; FontSize = 14 }
+    $spinner = New-Object System.Windows.Controls.ProgressBar -Property @{ IsIndeterminate = $true; Width = 220; Height = 8; Margin = New-Object System.Windows.Thickness(0, 12, 0, 0) }
+    [void]$panel.Children.Add($label)
+    [void]$panel.Children.Add($spinner)
+    $loadingWindow.Content = $panel
+    $loadingWindow.Show()
+
+    $runspace = [runspacefactory]::CreateRunspace()
+    $runspace.Open()
+    $worker = [powershell]::Create()
+    $worker.Runspace = $runspace
+    [void]$worker.AddScript({ & winget.exe list --accept-source-agreements --disable-interactivity 2>$null | Out-String })
+    $asyncResult = $worker.BeginInvoke()
+    $timer = New-Object System.Windows.Threading.DispatcherTimer
+    $timer.Interval = [TimeSpan]::FromMilliseconds(100)
+    $timer.Add_Tick({
+        if (-not $asyncResult.IsCompleted) { return }
+        $timer.Stop()
+        try {
+            $installedPackages = [string]$worker.EndInvoke($asyncResult)
+            foreach ($item in $appItems) {
+                $item.Installed = $installedPackages -match "(?im)(^|\s)$([regex]::Escape($item.Id))(\s|$)"
+                $item.Check.Content = if ($item.Installed) { "$($item.Name) (installed)" } else { $item.Name }
+                $item.Check.IsChecked = $false
+            }
+            $script:AppItemsInitialized = $true
+        } finally {
+            $worker.Dispose()
+            $runspace.Dispose()
+            if ($loadingWindow.IsVisible) { $loadingWindow.Close() }
+        }
+    }.GetNewClosure())
+    $timer.Start()
 }
 
 function Get-InfoSmartctlData([int]$DiskIndex) {
@@ -320,6 +440,10 @@ function Update-InfoPage {
 }
 
 function Start-AppOperation([string]$Action) {
+    if ($appItems.Count -eq 0 -or -not $appItems[0].ContainsKey('Installed')) {
+        Write-Log 'Installed app status is still loading. Please try again when the loading popup closes.'
+        return
+    }
     $selectedItems = if ($Action -eq 'install') {
         @($appItems | Where-Object { $_.Check.IsChecked -and -not $_.Installed })
     } else {
@@ -336,15 +460,17 @@ function Start-AppOperation([string]$Action) {
             $LogQueue.Enqueue("$Action $($item.Name)...")
             $outputPath = Join-Path $env:TEMP "MylesMattlock-winget-$([guid]::NewGuid()).log"
             $resultPath = Join-Path $env:TEMP "MylesMattlock-winget-$([guid]::NewGuid()).result"
-            $taskName = "MylesMattlock-Winget-$([guid]::NewGuid())"
+            $process = $null
+            $userProcessId = $null
             try {
                 $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$HelperPath`" -Action $Action -PackageId `"$($item.Id)`" -OutputPath `"$outputPath`" -ResultPath `"$resultPath`""
-                $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arguments
-                $taskTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
-                $taskPrincipal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
-                Register-ScheduledTask -TaskName $taskName -Action $taskAction -Trigger $taskTrigger -Principal $taskPrincipal -Force | Out-Null
-                Start-ScheduledTask -TaskName $taskName
+                if ($Action -eq 'uninstall') {
+                    $userProcessId = [Win32.UnelevatedProcess]::Start("powershell.exe $arguments")
+                } else {
+                    $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WindowStyle Hidden -PassThru
+                }
                 $lineCount = 0
+                $startedAt = Get-Date
                 do {
                     Start-Sleep -Milliseconds 100
                     if (Test-Path -LiteralPath $outputPath) {
@@ -354,12 +480,18 @@ function Start-AppOperation([string]$Action) {
                             $lineCount++
                         }
                     }
-                } while (-not (Test-Path -LiteralPath $resultPath))
-                $exitCode = [int](Get-Content -LiteralPath $resultPath -Raw)
+                    if (((Get-Date) - $startedAt).TotalMinutes -ge 30) {
+                        if ($process) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+                        throw "Timed out waiting for $Action $($item.Name) to finish."
+                    }
+                } while (($process -and -not $process.HasExited) -or ($userProcessId -and -not (Test-Path -LiteralPath $resultPath)))
+                if (-not (Test-Path -LiteralPath $resultPath)) {
+                    throw "$Action $($item.Name) exited without reporting a result."
+                }
+                $exitCode = [int](Get-Content -LiteralPath $resultPath -Raw -ErrorAction Stop)
                 $LogQueue.Enqueue("$($item.Name) finished with exit code $exitCode.")
             } catch { $LogQueue.Enqueue("Could not $Action $($item.Name): $($_.Exception.Message)") }
             finally {
-                Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
                 Remove-Item -LiteralPath $outputPath, $resultPath -Force -ErrorAction SilentlyContinue
             }
         }
@@ -404,6 +536,11 @@ function Start-AppOperation([string]$Action) {
 
 $InstallSelected.Add_Click({ Start-AppOperation 'install' })
 $UninstallSelected.Add_Click({ Start-AppOperation 'uninstall' })
+$MainTabs.Add_SelectionChanged({
+    if ($_.AddedItems -contains $InstallTab) {
+        Initialize-AppItemsWithLoading
+    }
+}.GetNewClosure())
 
 $RunDebloat.Add_Click({
     $selectedApps = @($removalCatalog | Where-Object { -not ($KeepTeams.IsChecked -and $_ -eq 'Microsoft.Teams') })
@@ -652,7 +789,6 @@ $startupTimer = New-Object System.Windows.Threading.DispatcherTimer
 $startupTimer.Interval = [TimeSpan]::FromMilliseconds(100)
 $startupTimer.Add_Tick({
     $this.Stop()
-    Initialize-AppItems
     Update-InfoPage
 }.GetNewClosure())
 $startupTimer.Start()
