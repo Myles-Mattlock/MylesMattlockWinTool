@@ -22,3 +22,14 @@ Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -
 ```
 
 The tool self-elevates to administrator. `CleanUp.ps1` remains in the repository as the original standalone cleanup implementation, but the main tool does not launch it.
+
+## Build locally
+
+Install the `ps2exe` PowerShell module once, then run the local packaging script:
+
+```powershell
+Install-Module -Name ps2exe -Scope CurrentUser
+.\BuildLocal.ps1
+```
+
+The output is written to `build\windowsinstaller`, with `WindowsInstaller.zip` created in `build`. The packaged executable includes the current `MM.ico`; `WingetUserHelper.ps1` and the resource folders are included beside it as runtime dependencies. The executable is compiled with administrator privileges enabled; if the Windows SDK is installed, the script also embeds `elevate.manifest.xml` with `mt.exe`.
