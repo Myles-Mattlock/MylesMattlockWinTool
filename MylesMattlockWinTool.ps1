@@ -304,6 +304,7 @@ function Get-AppItems {
 
 $appItems = @(Get-AppItems)
 $script:AppItemsInitialized = $false
+$script:AppItemsLoading = $false
 function Initialize-AppItems {
     if ($script:AppItemsInitialized) { return }
     $installedPackages = ''
@@ -319,10 +320,12 @@ function Initialize-AppItems {
 }
 
 function Initialize-AppItemsWithLoading {
-    if ($script:AppItemsInitialized) { return }
+    if ($script:AppItemsInitialized -or $script:AppItemsLoading) { return }
+    $script:AppItemsLoading = $true
     $loadingWindow = New-Object System.Windows.Window
     $loadingWindow.Title = 'Myles Mattlock WinTool'
     $loadingWindow.Owner = $window
+    $loadingWindow.ShowActivated = $false
     $loadingWindow.WindowStartupLocation = 'CenterOwner'
     $loadingWindow.WindowStyle = 'ToolWindow'
     $loadingWindow.ResizeMode = 'NoResize'
@@ -356,6 +359,7 @@ function Initialize-AppItemsWithLoading {
             }
             $script:AppItemsInitialized = $true
         } finally {
+            $script:AppItemsLoading = $false
             $worker.Dispose()
             $runspace.Dispose()
             if ($loadingWindow.IsVisible) { $loadingWindow.Close() }
