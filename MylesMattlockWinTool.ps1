@@ -88,7 +88,11 @@ namespace Win32 {
 }
 "@
 
-$script:Root = Split-Path -Parent $PSCommandPath
+$script:Root = if ($PSCommandPath) {
+    Split-Path -Parent $PSCommandPath
+} else {
+    [System.IO.Path]::GetDirectoryName([System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName)
+}
 $script:BrushConverter = [System.Windows.Media.BrushConverter]::new()
 $script:AppVersion = '1.0.0'
 
@@ -300,6 +304,7 @@ function Get-AppItems {
 
 $appItems = @(Get-AppItems)
 $script:AppItemsInitialized = $false
+$script:AppItemsLoading = $false
 function Initialize-AppItems {
     if ($script:AppItemsInitialized) { return }
     $installedPackages = ''
@@ -315,10 +320,12 @@ function Initialize-AppItems {
 }
 
 function Initialize-AppItemsWithLoading {
-    if ($script:AppItemsInitialized) { return }
+    if ($script:AppItemsInitialized -or $script:AppItemsLoading) { return }
+    $script:AppItemsLoading = $true
     $loadingWindow = New-Object System.Windows.Window
     $loadingWindow.Title = 'Myles Mattlock WinTool'
     $loadingWindow.Owner = $window
+    $loadingWindow.ShowActivated = $false
     $loadingWindow.WindowStartupLocation = 'CenterOwner'
     $loadingWindow.WindowStyle = 'ToolWindow'
     $loadingWindow.ResizeMode = 'NoResize'
@@ -352,6 +359,7 @@ function Initialize-AppItemsWithLoading {
             }
             $script:AppItemsInitialized = $true
         } finally {
+            $script:AppItemsLoading = $false
             $worker.Dispose()
             $runspace.Dispose()
             if ($loadingWindow.IsVisible) { $loadingWindow.Close() }
@@ -413,9 +421,9 @@ function Update-InfoPage {
             }
 
             $row = New-Object System.Windows.Controls.Grid
-            $row.Background = '#2D2D30'; $row.Padding = New-Object System.Windows.Thickness(12, 10, 12, 10); $row.Margin = New-Object System.Windows.Thickness(0, 0, 0, 8)
+            $row.Background = '#2D2D30'; $row.Margin = New-Object System.Windows.Thickness(0, 0, 0, 8)
             $label = New-Object System.Windows.Controls.TextBlock
-                $label.Text = "$($drive.Name.TrimEnd('\'))  ($([math]::Round($drive.TotalSize / 1GB, 1)) GB)"; $label.Foreground = '#FFFFFF'; $label.FontSize = 14; $label.VerticalAlignment = 'Center'
+                $label.Text = "$($drive.Name.TrimEnd('\'))  ($([math]::Round($drive.TotalSize / 1GB, 1)) GB)"; $label.Foreground = '#FFFFFF'; $label.FontSize = 14; $label.Margin = New-Object System.Windows.Thickness(12, 10, 12, 10); $label.VerticalAlignment = 'Center'
             $status = New-Object System.Windows.Controls.TextBlock
             $status.Text = $health; $status.Foreground = $healthColor; $status.FontWeight = 'Bold'; $status.FontSize = 14; $status.HorizontalAlignment = 'Right'; $status.VerticalAlignment = 'Center'
             [void]$row.Children.Add($label); [void]$row.Children.Add($status)
@@ -426,9 +434,9 @@ function Update-InfoPage {
         $fixedDrives = @([System.IO.DriveInfo]::GetDrives() | Where-Object { $_.DriveType -eq 'Fixed' -and $_.IsReady })
         foreach ($drive in $fixedDrives) {
             $row = New-Object System.Windows.Controls.Grid
-            $row.Background = '#2D2D30'; $row.Padding = New-Object System.Windows.Thickness(12, 10, 12, 10); $row.Margin = New-Object System.Windows.Thickness(0, 0, 0, 8)
+            $row.Background = '#2D2D30'; $row.Margin = New-Object System.Windows.Thickness(0, 0, 0, 8)
             $label = New-Object System.Windows.Controls.TextBlock
-            $label.Text = "$($drive.Name.TrimEnd('\'))  ($([math]::Round($drive.TotalSize / 1GB, 1)) GB)"; $label.Foreground = '#FFFFFF'; $label.FontSize = 14
+            $label.Text = "$($drive.Name.TrimEnd('\'))  ($([math]::Round($drive.TotalSize / 1GB, 1)) GB)"; $label.Foreground = '#FFFFFF'; $label.FontSize = 14; $label.Margin = New-Object System.Windows.Thickness(12, 10, 12, 10)
             $status = New-Object System.Windows.Controls.TextBlock
             $status.Text = 'N/A'; $status.Foreground = '#888888'; $status.FontWeight = 'Bold'; $status.FontSize = 14; $status.HorizontalAlignment = 'Right'
             [void]$row.Children.Add($label); [void]$row.Children.Add($status)
@@ -460,15 +468,10 @@ function Start-AppOperation([string]$Action) {
             $LogQueue.Enqueue("$Action $($item.Name)...")
             $outputPath = Join-Path $env:TEMP "MylesMattlock-winget-$([guid]::NewGuid()).log"
             $resultPath = Join-Path $env:TEMP "MylesMattlock-winget-$([guid]::NewGuid()).result"
-            $process = $null
             $userProcessId = $null
             try {
                 $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$HelperPath`" -Action $Action -PackageId `"$($item.Id)`" -OutputPath `"$outputPath`" -ResultPath `"$resultPath`""
-                if ($Action -eq 'uninstall') {
-                    $userProcessId = [Win32.UnelevatedProcess]::Start("powershell.exe $arguments")
-                } else {
-                    $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WindowStyle Hidden -PassThru
-                }
+                $userProcessId = [Win32.UnelevatedProcess]::Start("powershell.exe $arguments")
                 $lineCount = 0
                 $startedAt = Get-Date
                 do {
@@ -481,10 +484,9 @@ function Start-AppOperation([string]$Action) {
                         }
                     }
                     if (((Get-Date) - $startedAt).TotalMinutes -ge 30) {
-                        if ($process) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
                         throw "Timed out waiting for $Action $($item.Name) to finish."
                     }
-                } while (($process -and -not $process.HasExited) -or ($userProcessId -and -not (Test-Path -LiteralPath $resultPath)))
+                } while ($userProcessId -and -not (Test-Path -LiteralPath $resultPath))
                 if (-not (Test-Path -LiteralPath $resultPath)) {
                     throw "$Action $($item.Name) exited without reporting a result."
                 }

@@ -25,20 +25,20 @@ jobs:
 
     - name: Prepare Staging and Build Executables
       run: |
-        # 1. Create the root folder 'windowsinstaller'
+        # 1. Create the package folder
         New-Item -ItemType Directory -Force -Path "ZipStage\windowsinstaller"
         
-        # 2. Create the nested 'windowsinstaller' folder inside the root
-        New-Item -ItemType Directory -Force -Path "ZipStage\windowsinstaller\windowsinstaller"
-        
-        # 3. Compile the main tool -> MylesMattlockWinTool.exe (placed in root)
+        # 2. Compile the main tool. Runtime dependencies must be beside the
+        # executable because the script resolves them from its own directory.
         # WingetUserHelper.ps1 remains beside the executable because the tool
         # launches it with PowerShell when installing or removing applications.
         ps2exe -InputFile MylesMattlockWinTool.ps1 -OutputFile 'ZipStage\windowsinstaller\MylesMattlockWinTool.exe' -IconFile MM.ico -version '1.0.0'
         
-        # 4. Copy repo files into the nested 'windowsinstaller' folder
-        # This excludes the ZipStage itself to avoid infinite loops
-        Get-ChildItem -Exclude "ZipStage", ".git", ".github", ".gitignore", "elevate.manifest.xml", "InstallApplications.ps1", "Installer.ps1", "MylesMattlockWinTool.ps1", "set-execution-policy.reg", "ToDo", "UpdatePolicy.ps1", "README.md", "MM.ico"| Copy-Item -Destination "ZipStage\windowsinstaller\windowsinstaller" -Recurse -Force
+        # 3. Copy runtime files beside the executable. This excludes build-only
+        # files and the source entry point, while retaining helper scripts and
+        # resource folders such as SystemCleanUp.
+        Get-ChildItem -Exclude "ZipStage", ".git", ".github", ".gitignore", "elevate.manifest.xml", "InstallApplications.ps1", "Installer.ps1", "MylesMattlockWinTool.ps1", "set-execution-policy.reg", "ToDo", "UpdatePolicy.ps1", "README.md", "MM.ico" |
+          Copy-Item -Destination "ZipStage\windowsinstaller" -Recurse -Force
       shell: pwsh
 
     - name: Embed Admin Manifests (mt.exe)
