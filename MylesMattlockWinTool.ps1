@@ -109,17 +109,25 @@ $script:AppVersion = '1.0.0'
             <Setter Property="Padding" Value="16,9"/>
             <Setter Property="Margin" Value="0,0,8,8"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="5" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="#FFFFFF"/>
             <Setter Property="Margin" Value="0,0,0,10"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>
-        <Style TargetType="TabItem">
-            <Setter Property="Padding" Value="18,10"/>
-            <Setter Property="FontSize" Value="14"/>
-        </Style>
-        <Style x:Key="CleanupActionButton" TargetType="Button">
+        <Style x:Key="CleanupActionButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Background" Value="#007ACC"/>
             <Setter Property="Foreground" Value="#FFFFFF"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -149,8 +157,29 @@ $script:AppVersion = '1.0.0'
                 </StackPanel>
             </Grid>
         </Border>
-        <TabControl x:Name="MainTabs" Grid.Row="1" Background="#252526" BorderThickness="0">
-            <TabItem Header="Info" Foreground="#000000">
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <Button x:Name="InfoTabButton" Content="Info" Margin="0,0,8,0" Padding="20,9" Height="35"/>
+                <Button x:Name="InstallTabButton" Content="Install / Remove Apps" Margin="0,0,8,0" Padding="20,9" Height="35"/>
+                <Button x:Name="CustomizationTabButton" Content="Customization" Margin="0,0,8,0" Padding="20,9" Height="35"/>
+                <Button x:Name="CleanupTabButton" Content="Cleanup" Margin="0,0,8,0" Padding="20,9" Height="35" VerticalAlignment="Top"/>
+            </StackPanel>
+            <TabControl x:Name="MainTabs" Grid.Row="1" Background="#252526" BorderThickness="0" BorderBrush="#252526" Padding="0">
+                <TabControl.Template>
+                    <ControlTemplate TargetType="TabControl">
+                        <Border Background="#252526" BorderBrush="#3A3A3D" BorderThickness="1" CornerRadius="8" Padding="0">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Margin="0"
+                                              ContentSource="SelectedContent"
+                                              SnapsToDevicePixels="True"/>
+                        </Border>
+                    </ControlTemplate>
+                </TabControl.Template>
+            <TabItem Header="Info">
                 <ScrollViewer Padding="20" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <TextBlock Text="System Information" Foreground="#00A8E8" FontWeight="Bold" FontSize="12" Margin="0,0,0,14"/>
@@ -217,22 +246,56 @@ $script:AppVersion = '1.0.0'
                 </ScrollViewer>
             </TabItem>
             <TabItem Header="Cleanup">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <Grid Margin="0,0,20,20">
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                    <Border Grid.Row="0" Background="#252526" CornerRadius="8" Padding="20" Margin="0,0,0,15">
-                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="System Cleanup" Foreground="#00A8E8" FontWeight="Bold" FontSize="12" Margin="0,0,0,0"/><TextBlock Text="Optimize storage, system files, and component health" FontSize="14" Foreground="#AAAAAA" Margin="0,0,0,0"/></StackPanel></Grid>
+                <ScrollViewer Padding="20,24,20,20" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                    <Border Background="#252526" CornerRadius="8" Padding="20" Margin="0,0,0,15">
+                        <StackPanel>
+                            <TextBlock Text="System Cleanup" Foreground="#00A8E8" FontWeight="Bold" FontSize="12" Margin="0,0,0,0"/>
+                            <TextBlock Text="Optimize storage, system files, and component health" FontSize="14" Foreground="#AAAAAA" Margin="0,0,0,0"/>
+                        </StackPanel>
                     </Border>
-                    <Border Grid.Row="2" Background="#252526" CornerRadius="6" Padding="12" Margin="0,0,0,15">
-                        <StackPanel><TextBlock Text="SELECT TASKS TO RUN" FontSize="11" FontWeight="Bold" Foreground="#888888" Margin="0,0,0,8"/><WrapPanel Height="30" Margin="0,0,0,8"><TextBlock Text="PROFILES:" FontSize="11" FontWeight="Bold" Foreground="#888888" VerticalAlignment="Center" Margin="0,0,10,0"/><Button x:Name="DefaultProfile" Content="Default" Width="80" Height="26" Padding="4,0" Background="#007ACC" FontSize="11" Margin="0,0,6,0"/><Button x:Name="ServerProfile" Content="Server Cleanup" Width="105" Height="26" Padding="4,0" Background="#2D2D30" Foreground="#AAAAAA" FontSize="11" Margin="0,0,6,0"/><Button x:Name="CustomProfile" Content="Custom" Width="80" Height="26" Padding="4,0" Background="#2D2D30" Foreground="#AAAAAA" FontSize="11"/></WrapPanel><WrapPanel><CheckBox x:Name="CleanupTemp" Content="Clear Temp Files &amp; System Logs" IsChecked="True" Margin="0,0,15,5"/><CheckBox x:Name="CleanupRecycle" Content="Empty Recycle Bin" IsChecked="True" Margin="0,0,15,5"/><CheckBox x:Name="CleanupCleanmgr" Content="Run Disk Cleanup Utility" IsChecked="True" Margin="0,0,15,5"/><CheckBox x:Name="CleanupDns" Content="Flush DNS Cache" IsChecked="True" Margin="0,0,15,5"/><CheckBox x:Name="CleanupDism" Content="DISM Component Store Cleanup" IsChecked="True" Margin="0,0,15,5"/></WrapPanel></StackPanel>
+                    <Border Background="#252526" CornerRadius="6" Padding="12" Margin="0,0,0,15">
+                        <StackPanel>
+                            <TextBlock Text="SELECT TASKS TO RUN" FontSize="11" FontWeight="Bold" Foreground="#888888" Margin="0,0,0,8"/>
+                            <WrapPanel Height="30" Margin="0,0,0,8">
+                                <TextBlock Text="PROFILES:" FontSize="11" FontWeight="Bold" Foreground="#888888" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <Button x:Name="DefaultProfile" Content="Default" Width="80" Height="26" Padding="4,0" Background="#007ACC" FontSize="11" Margin="0,0,6,0"/>
+                                <Button x:Name="ServerProfile" Content="Server Cleanup" Width="105" Height="26" Padding="4,0" Background="#2D2D30" Foreground="#AAAAAA" FontSize="11" Margin="0,0,6,0"/>
+                                <Button x:Name="CustomProfile" Content="Custom" Width="80" Height="26" Padding="4,0" Background="#2D2D30" Foreground="#AAAAAA" FontSize="11"/>
+                            </WrapPanel>
+                            <WrapPanel>
+                                <CheckBox x:Name="CleanupTemp" Content="Clear Temp Files &amp; System Logs" IsChecked="True" Margin="0,0,15,5"/>
+                                <CheckBox x:Name="CleanupRecycle" Content="Empty Recycle Bin" IsChecked="True" Margin="0,0,15,5"/>
+                                <CheckBox x:Name="CleanupCleanmgr" Content="Run Disk Cleanup Utility" IsChecked="True" Margin="0,0,15,5"/>
+                                <CheckBox x:Name="CleanupDns" Content="Flush DNS Cache" IsChecked="True" Margin="0,0,15,5"/>
+                                <CheckBox x:Name="CleanupDism" Content="DISM Component Store Cleanup" IsChecked="True" Margin="0,0,15,5"/>
+                            </WrapPanel>
+                        </StackPanel>
                     </Border>
-                    <Border Grid.Row="3" Background="#2D2D30" CornerRadius="6" Padding="15" Margin="0,0,0,0"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="TOTAL STORAGE RECLAIMED" FontSize="11" FontWeight="Bold" Foreground="#888888"/><TextBlock Text="Space freed during the current optimization session" FontSize="12" Foreground="#AAAAAA" Margin="0,2,0,0"/></StackPanel><TextBlock Grid.Column="1" Text="0 MB" FontSize="22" FontWeight="Bold" Foreground="#00FF66" VerticalAlignment="Center"/></Grid></Border>
-                    <Grid Grid.Row="4" Height="18" Margin="0,15,0,15"><ProgressBar x:Name="CleanupProgress" Value="0" Maximum="100" Background="#2D2D30" Foreground="#007ACC"/><TextBlock x:Name="CleanupProgressPercent" Text="0%" Foreground="#FFFFFF" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
-                    <Grid Grid.Row="5"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="CleanupStatus" Text="Ready to start cleanup." Foreground="#AAAAAA" FontSize="14" VerticalAlignment="Center"/><Button x:Name="StartCleanup" Grid.Column="1" Content="Start Cleanup" Width="160" Height="42" Style="{StaticResource CleanupActionButton}"/></Grid>
-                </Grid>
+                    <Border Background="#2D2D30" CornerRadius="6" Padding="15" Margin="0,0,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="TOTAL STORAGE RECLAIMED" FontSize="11" FontWeight="Bold" Foreground="#888888"/>
+                                <TextBlock Text="Space freed during the current optimization session" FontSize="12" Foreground="#AAAAAA" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="0 MB" FontSize="22" FontWeight="Bold" Foreground="#00FF66" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Grid Height="18" Margin="0,15,0,15">
+                        <ProgressBar x:Name="CleanupProgress" Value="0" Maximum="100" Background="#2D2D30" Foreground="#007ACC"/>
+                        <TextBlock x:Name="CleanupProgressPercent" Text="0%" Foreground="#FFFFFF" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="CleanupStatus" Text="Ready to start cleanup." Foreground="#AAAAAA" FontSize="14" VerticalAlignment="Center"/>
+                        <Button x:Name="StartCleanup" Grid.Column="1" Content="Start Cleanup" Width="160" Height="42" Style="{StaticResource CleanupActionButton}"/>
+                    </Grid>
+                </StackPanel>
                 </ScrollViewer>
             </TabItem>
-        </TabControl>
+            </TabControl>
+        </Grid>
         <Border Grid.Row="2" Background="#0C0C0C" BorderBrush="#333333" BorderThickness="1" Padding="12" Margin="0,16,0,0">
             <ScrollViewer x:Name="LogScroll" VerticalScrollBarVisibility="Auto">
                 <TextBox x:Name="Log" Background="Transparent" Foreground="#00FF66" BorderThickness="0" FontFamily="Consolas" IsReadOnly="True" TextWrapping="Wrap"/>
@@ -244,8 +307,18 @@ $script:AppVersion = '1.0.0'
 
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
-@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
+@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InfoTabButton','InstallTabButton','CustomizationTabButton','CleanupTabButton','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
     Set-Variable -Name $_ -Value $window.FindName($_)
+}
+
+function Set-NavigationState([int]$Index) {
+    $MainTabs.SelectedIndex = $Index
+    $active = '#1C97F0'
+    $inactive = '#007ACC'
+    $InfoTabButton.Background = if ($Index -eq 0) { $active } else { $inactive }
+    $InstallTabButton.Background = if ($Index -eq 1) { $active } else { $inactive }
+    $CustomizationTabButton.Background = if ($Index -eq 2) { $active } else { $inactive }
+    $CleanupTabButton.Background = if ($Index -eq 3) { $active } else { $inactive }
 }
 
 $removalCatalog = @(
@@ -538,10 +611,15 @@ function Start-AppOperation([string]$Action) {
 
 $InstallSelected.Add_Click({ Start-AppOperation 'install' })
 $UninstallSelected.Add_Click({ Start-AppOperation 'uninstall' })
+$InfoTabButton.Add_Click({ Set-NavigationState 0 })
+$InstallTabButton.Add_Click({ Set-NavigationState 1 })
+$CustomizationTabButton.Add_Click({ Set-NavigationState 2 })
+$CleanupTabButton.Add_Click({ Set-NavigationState 3 })
 $MainTabs.Add_SelectionChanged({
     if ($_.AddedItems -contains $InstallTab) {
         Initialize-AppItemsWithLoading
     }
+    Set-NavigationState $MainTabs.SelectedIndex
 }.GetNewClosure())
 
 $RunDebloat.Add_Click({
