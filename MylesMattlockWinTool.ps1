@@ -4,7 +4,7 @@
     [Security.Principal.WindowsBuiltInRole]::Administrator
 )
 if (-not $isAdmin) {
-    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs -WindowStyle Hidden
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs -WindowStyle Hidden -Wait
     exit
 }
 
@@ -236,6 +236,7 @@ $script:AppVersion = '1.0.0'
                         <CheckBox x:Name="HideRecommended" Content="Hide Recommended section in Start" IsChecked="True"/>
                         <CheckBox x:Name="DarkMode" Content="Use dark mode" IsChecked="True"/>
                         <CheckBox x:Name="DefenderPua" Content="Enable potentially unwanted app protection" IsChecked="True"/>
+                        <CheckBox x:Name="SetCursor" Content="Set text cursor" IsChecked="True"/>
                         <Button x:Name="ApplyCustomization" Content="Apply customization" HorizontalAlignment="Left"/>
                         <Separator Margin="0,18,0,12"/>
                         <TextBlock Text="Debloat" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -307,7 +308,7 @@ $script:AppVersion = '1.0.0'
 
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
-@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InfoTabButton','InstallTabButton','CustomizationTabButton','CleanupTabButton','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
+@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InfoTabButton','InstallTabButton','CustomizationTabButton','CleanupTabButton','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','SetCursor','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
     Set-Variable -Name $_ -Value $window.FindName($_)
 }
 
@@ -679,6 +680,14 @@ $ApplyCustomization.Add_Click({
         Set-ItemProperty -Path $personalize -Name AppsUseLightTheme -Value ([int](-not $DarkMode.IsChecked))
         Set-ItemProperty -Path $personalize -Name SystemUsesLightTheme -Value ([int](-not $DarkMode.IsChecked))
         if ($DefenderPua.IsChecked) { Set-MpPreference -PUAProtection Enabled }
+        if ($SetCursor.IsChecked) {
+            $cursorScript = Join-Path $script:Root 'set-cursor.ps1'
+            if (-not (Test-Path -LiteralPath $cursorScript)) {
+                throw "Cursor setup script not found: $cursorScript"
+            }
+            Push-Location $script:Root
+            try { & $cursorScript } finally { Pop-Location }
+        }
         Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
         Start-Process explorer.exe
         Write-Log 'Customization applied. Explorer restarted.'

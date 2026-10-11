@@ -6,30 +6,28 @@ PowerShell WPF tool for managing a Windows workstation from separate pages:
 - **Customization**: apply Explorer, Start, theme, and Defender preferences.
 - **Cleanup**: run the cleanup tasks directly inside the tool, with the same task selection and terminal-style logging as the original cleanup interface.
 
-## Run
+## Run from PowerShell
 
 Open PowerShell as needed and run:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
 .\MylesMattlockWinTool.ps1
 ```
 
-To launch it without leaving a PowerShell window visible, run:
+The tool self-elevates to administrator. Keep `WingetUserHelper.ps1`, `set-cursor.ps1`, `Text-Select-Myles.cur`, and the `SystemCleanUp` resources beside the script.
+
+## Run from the web
+
+Once `https://myles-mattlock.co.uk/wintool` is configured to redirect to the [production launcher release asset](https://github.com/Myles-Mattlock/MylesMattlockWinTool/releases/download/prod-latest/Invoke-MylesMattlockWinTool.ps1), launch the latest package published from `main` with:
 
 ```powershell
-Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PWD\MylesMattlockWinTool.ps1`"" -WindowStyle Hidden
+irm https://myles-mattlock.co.uk/wintool | iex
 ```
 
-The tool self-elevates to administrator. `CleanUp.ps1` remains in the repository as the original standalone cleanup implementation, but the main tool does not launch it.
+The launcher downloads the matching `WinTool.zip` from its release channel, extracts it to a temporary folder, and runs the PowerShell app. The app requests administrator access and the launcher waits for it to exit before cleaning up the temporary files. Pushes to `dev` publish the `beta-latest` channel; pushes to `main` publish the `prod-latest` channel.
 
-## Build locally
-
-Install the `ps2exe` PowerShell module once, then run the local packaging script:
+To test the latest `dev` build directly, run:
 
 ```powershell
-Install-Module -Name ps2exe -Scope CurrentUser
-.\BuildLocal.ps1
+irm https://github.com/Myles-Mattlock/MylesMattlockWinTool/releases/download/beta-latest/Invoke-MylesMattlockWinTool.ps1 | iex
 ```
-
-The output is written to `build\windowsinstaller`, with `WindowsInstaller.zip` created in `build`. The packaged executable includes the current `MM.ico`; `WingetUserHelper.ps1` and the resource folders are included beside it as runtime dependencies. The executable is compiled with administrator privileges enabled; if the Windows SDK is installed, the script also embeds `elevate.manifest.xml` with `mt.exe`.
