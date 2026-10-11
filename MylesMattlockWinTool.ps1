@@ -661,8 +661,37 @@ $RunDebloat.Add_Click({
         foreach ($app in $Apps) {
             $LogQueue.Enqueue("uninstall $app...")
             try {
-                & winget.exe uninstall --name $app --scope user --accept-source-agreements 2>&1 | ForEach-Object { $LogQueue.Enqueue([string]$_) }
-                $LogQueue.Enqueue("$app finished with exit code $LASTEXITCODE.")
+                if ($app -eq 'Microsoft.Teams') {
+                    & winget.exe remove --id Microsoft.Teams --exact --scope user --accept-source-agreements 2>&1 | ForEach-Object { $LogQueue.Enqueue([string]$_) }
+                    $wingetExitCode = $LASTEXITCODE
+
+                    $teamsPackages = @(Get-AppxPackage -Name 'MSTeams')
+                    foreach ($package in $teamsPackages) {
+                        $LogQueue.Enqueue("Removing Teams AppX package $($package.PackageFullName)...")
+                        Remove-AppxPackage -Package $package.PackageFullName -ErrorAction Stop
+                    }
+
+                    $provisionedTeams = @(Get-AppxProvisionedPackage -Online | Where-Object {
+                        $_.DisplayName -eq 'MSTeams' -or $_.PackageName -like 'MSTeams_*'
+                    })
+                    foreach ($package in $provisionedTeams) {
+                        $LogQueue.Enqueue("Removing provisioned Teams package $($package.PackageName)...")
+                        Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -ErrorAction Stop | Out-Null
+                    }
+
+                    if (@(Get-AppxPackage -Name 'MSTeams').Count -gt 0) {
+                        throw 'Microsoft Teams is still registered for the current user.'
+                    }
+                    if (@(Get-AppxProvisionedPackage -Online | Where-Object {
+                        $_.DisplayName -eq 'MSTeams' -or $_.PackageName -like 'MSTeams_*'
+                    }).Count -gt 0) {
+                        throw 'Microsoft Teams is still provisioned for new users.'
+                    }
+                    $LogQueue.Enqueue("Microsoft Teams AppX cleanup complete (WinGet exit code $wingetExitCode).")
+                } else {
+                    & winget.exe uninstall --name $app --scope user --accept-source-agreements 2>&1 | ForEach-Object { $LogQueue.Enqueue([string]$_) }
+                    $LogQueue.Enqueue("$app finished with exit code $LASTEXITCODE.")
+                }
             } catch { $LogQueue.Enqueue("Could not uninstall ${app}: $($_.Exception.Message)") }
         }
         $FinishedQueue.Enqueue($true)
