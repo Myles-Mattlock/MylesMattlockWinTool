@@ -3,7 +3,7 @@
 PowerShell WPF tool for managing a Windows workstation from separate pages:
 
 - **Install / Remove Apps**: install common applications with `winget` and remove selected Windows apps.
-- **Customization**: apply Explorer, Start, theme, and Defender preferences.
+- **Customization**: apply Explorer, Start, theme, Defender, Windows Update, and privacy registry options.
 - **Cleanup**: run the cleanup tasks directly inside the tool, with the same task selection and terminal-style logging as the original cleanup interface.
 
 ## Run from PowerShell
