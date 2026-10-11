@@ -265,7 +265,7 @@ $script:AppVersion = '1.0.0'
                         <Button x:Name="ApplyCustomization" Content="Apply customization" HorizontalAlignment="Left"/>
                         <Separator Margin="0,18,0,12"/>
                         <TextBlock Text="Debloat" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
-                        <CheckBox x:Name="KeepTeams" Content="Keep Microsoft Teams" IsChecked="False"/>
+                        <CheckBox x:Name="RemoveTeams" Content="Remove Microsoft Teams" IsChecked="True"/>
                         <Button x:Name="RunDebloat" Content="Run debloat" Background="#A83D3D" HorizontalAlignment="Left"/>
                         <TextBlock Text="Changes are applied to the current user unless Windows requires administrator access." Foreground="#888888" TextWrapping="Wrap" Margin="0,8,0,0"/>
                     </StackPanel>
@@ -333,7 +333,7 @@ $script:AppVersion = '1.0.0'
 
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
-@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InfoTabButton','InstallTabButton','CustomizationTabButton','CleanupTabButton','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','DisableTaskView','HideRecommended','DarkMode','DefenderPua','SetCursor','OpenThisPc','FileSelectionCheckboxes','TaskbarEndTask','DisableBingSearch','ShowAllAppsList','RemoveStartMenuMoreProgramsLimit','DisableDeliveryOptimizationPeers','DeferWindowsUpdates','VerboseLogonStatus','DisableAdvertisingId','DisableTailoredExperiences','DisableOnlineSpeechRecognition','DisableInputPersonalization','DisableWindowsTelemetry','DisableActivityPublishing','DisableStartAppTracking','DisableFeedbackRequests','DisablePowerShellTelemetry','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
+@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InfoTabButton','InstallTabButton','CustomizationTabButton','CleanupTabButton','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','DisableTaskView','HideRecommended','DarkMode','DefenderPua','SetCursor','OpenThisPc','FileSelectionCheckboxes','TaskbarEndTask','DisableBingSearch','ShowAllAppsList','RemoveStartMenuMoreProgramsLimit','DisableDeliveryOptimizationPeers','DeferWindowsUpdates','VerboseLogonStatus','DisableAdvertisingId','DisableTailoredExperiences','DisableOnlineSpeechRecognition','DisableInputPersonalization','DisableWindowsTelemetry','DisableActivityPublishing','DisableStartAppTracking','DisableFeedbackRequests','DisablePowerShellTelemetry','InstallSelected','UninstallSelected','ApplyCustomization','RemoveTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
     Set-Variable -Name $_ -Value $window.FindName($_)
 }
 
@@ -649,8 +649,9 @@ $MainTabs.Add_SelectionChanged({
 }.GetNewClosure())
 
 $RunDebloat.Add_Click({
-    $selectedApps = @($removalCatalog | Where-Object { -not ($KeepTeams.IsChecked -and $_ -eq 'Microsoft.Teams') })
-    $confirm = [System.Windows.Forms.MessageBox]::Show("Run debloat and remove $($selectedApps.Count) applications?`r`n`r`nMicrosoft Teams will be kept: $($KeepTeams.IsChecked)", 'Confirm debloat', 'YesNo', 'Warning')
+    $selectedApps = @($removalCatalog | Where-Object { $RemoveTeams.IsChecked -or $_ -ne 'Microsoft.Teams' })
+    $teamsMessage = if ($RemoveTeams.IsChecked) { 'Microsoft Teams will be removed' } else { 'Microsoft Teams will be kept' }
+    $confirm = [System.Windows.Forms.MessageBox]::Show("Run debloat and remove $($selectedApps.Count) applications?`r`n`r`n$teamsMessage", 'Confirm debloat', 'YesNo', 'Warning')
     if ($confirm -ne 'Yes') { return }
     $RunDebloat.IsEnabled = $false
     $removalLogQueue = [System.Collections.Concurrent.ConcurrentQueue[string]]::new()
