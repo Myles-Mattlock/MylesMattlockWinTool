@@ -237,6 +237,31 @@ $script:AppVersion = '1.0.0'
                         <CheckBox x:Name="DarkMode" Content="Use dark mode" IsChecked="True"/>
                         <CheckBox x:Name="DefenderPua" Content="Enable potentially unwanted app protection" IsChecked="True"/>
                         <CheckBox x:Name="SetCursor" Content="Set text cursor" IsChecked="True"/>
+                        <Separator Margin="0,14,0,10"/>
+                        <TextBlock Text="Explorer, Start, and taskbar" Foreground="#00A8E8" FontWeight="Bold" FontSize="12" Margin="0,0,0,8"/>
+                        <CheckBox x:Name="OpenThisPc" Content="Open File Explorer to This PC" IsChecked="True"/>
+                        <CheckBox x:Name="FileSelectionCheckboxes" Content="Show item check boxes in File Explorer" IsChecked="True"/>
+                        <CheckBox x:Name="TaskbarEndTask" Content="Enable End task on the taskbar" IsChecked="True"/>
+                        <CheckBox x:Name="DisableBingSearch" Content="Disable Bing search in Start" IsChecked="True"/>
+                        <CheckBox x:Name="ShowAllAppsList" Content="Show the all apps list in Start" IsChecked="True"/>
+                        <CheckBox x:Name="RemoveStartMenuMoreProgramsLimit" Content="Remove the Start menu all apps restriction" IsChecked="True"/>
+                        <Separator Margin="0,14,0,10"/>
+                        <TextBlock Text="Windows Update and system" Foreground="#00A8E8" FontWeight="Bold" FontSize="12" Margin="0,0,0,8"/>
+                        <CheckBox x:Name="DisableDeliveryOptimizationPeers" Content="Disable Delivery Optimization peer-to-peer downloads" IsChecked="True"/>
+                        <CheckBox x:Name="DeferWindowsUpdates" Content="Defer feature updates 365 days and quality updates 4 days" IsChecked="True"/>
+                        <CheckBox x:Name="VerboseLogonStatus" Content="Show detailed sign-in and shutdown messages" IsChecked="True"/>
+                        <Separator Margin="0,14,0,10"/>
+                        <TextBlock Text="Privacy" Foreground="#00A8E8" FontWeight="Bold" FontSize="12" Margin="0,0,0,8"/>
+                        <CheckBox x:Name="DisableAdvertisingId" Content="Disable the advertising ID" IsChecked="True"/>
+                        <CheckBox x:Name="DisableTailoredExperiences" Content="Disable tailored experiences" IsChecked="True"/>
+                        <CheckBox x:Name="DisableOnlineSpeechRecognition" Content="Disable online speech recognition consent" IsChecked="True"/>
+                        <CheckBox x:Name="DisableInputPersonalization" Content="Disable input, ink, and typing personalization" IsChecked="True"/>
+                        <CheckBox x:Name="DisableWindowsTelemetry" Content="Set the Windows telemetry policy to 0 (where supported)" IsChecked="True"/>
+                        <CheckBox x:Name="DisableActivityPublishing" Content="Disable activity publishing" IsChecked="True"/>
+                        <CheckBox x:Name="DisableStartAppTracking" Content="Disable Start menu app tracking" IsChecked="True"/>
+                        <CheckBox x:Name="DisableFeedbackRequests" Content="Disable Windows feedback prompts" IsChecked="True"/>
+                        <CheckBox x:Name="DisablePowerShellTelemetry" Content="Disable PowerShell telemetry" IsChecked="True"/>
+                        <TextBlock Text="Checked registry options are applied; unchecked options are left unchanged." Foreground="#888888" TextWrapping="Wrap" Margin="0,6,0,0"/>
                         <Button x:Name="ApplyCustomization" Content="Apply customization" HorizontalAlignment="Left"/>
                         <Separator Margin="0,18,0,12"/>
                         <TextBlock Text="Debloat" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -308,7 +333,7 @@ $script:AppVersion = '1.0.0'
 
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
-@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InfoTabButton','InstallTabButton','CustomizationTabButton','CleanupTabButton','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','SetCursor','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
+@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InfoTabButton','InstallTabButton','CustomizationTabButton','CleanupTabButton','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','SetCursor','OpenThisPc','FileSelectionCheckboxes','TaskbarEndTask','DisableBingSearch','ShowAllAppsList','RemoveStartMenuMoreProgramsLimit','DisableDeliveryOptimizationPeers','DeferWindowsUpdates','VerboseLogonStatus','DisableAdvertisingId','DisableTailoredExperiences','DisableOnlineSpeechRecognition','DisableInputPersonalization','DisableWindowsTelemetry','DisableActivityPublishing','DisableStartAppTracking','DisableFeedbackRequests','DisablePowerShellTelemetry','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
     Set-Variable -Name $_ -Value $window.FindName($_)
 }
 
@@ -668,6 +693,13 @@ $RunDebloat.Add_Click({
     $debloatTimer.Start()
 })
 
+function Set-CustomizationDword([string]$Path, [string]$Name, [int]$Value) {
+    if (-not (Test-Path -LiteralPath $Path)) {
+        New-Item -Path $Path -Force | Out-Null
+    }
+    New-ItemProperty -LiteralPath $Path -Name $Name -Value $Value -PropertyType DWord -Force | Out-Null
+}
+
 $ApplyCustomization.Add_Click({
     try {
         $advanced = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
@@ -679,7 +711,89 @@ $ApplyCustomization.Add_Click({
         $personalize = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
         Set-ItemProperty -Path $personalize -Name AppsUseLightTheme -Value ([int](-not $DarkMode.IsChecked))
         Set-ItemProperty -Path $personalize -Name SystemUsesLightTheme -Value ([int](-not $DarkMode.IsChecked))
-        if ($DefenderPua.IsChecked) { Set-MpPreference -PUAProtection Enabled }
+        if ($DefenderPua.IsChecked) {
+            Set-MpPreference -PUAProtection Enabled
+            $defenderReputation = 'HKCU:\Software\Microsoft\Windows Defender\Reputation-based Protection'
+            Set-CustomizationDword $defenderReputation 'EnableAppRepControl' 1
+            Set-CustomizationDword $defenderReputation 'BlockPUAApps' 1
+        }
+
+        if ($OpenThisPc.IsChecked) { Set-CustomizationDword $advanced 'LaunchTo' 1 }
+        if ($FileSelectionCheckboxes.IsChecked) { Set-CustomizationDword $advanced 'AutoCheckSelect' 1 }
+        if ($TaskbarEndTask.IsChecked) {
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings' 'TaskbarEndTask' 1
+        }
+        if ($DisableBingSearch.IsChecked) {
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search' 'BingSearchEnabled' 0
+        }
+        if ($ShowAllAppsList.IsChecked) {
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Start' 'AllAppsViewMode' 2
+        }
+        if ($RemoveStartMenuMoreProgramsLimit.IsChecked) {
+            $startMenuPolicy = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer'
+            if (Test-Path -LiteralPath $startMenuPolicy) {
+                $policyProperties = Get-ItemProperty -LiteralPath $startMenuPolicy
+                if ($policyProperties.PSObject.Properties.Name -contains 'NoStartMenuMorePrograms') {
+                    Remove-ItemProperty -LiteralPath $startMenuPolicy -Name 'NoStartMenuMorePrograms'
+                }
+            }
+        }
+
+        if ($DisableDeliveryOptimizationPeers.IsChecked) {
+            Set-CustomizationDword 'Registry::HKEY_USERS\S-1-5-20\Software\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Settings' 'DownloadMode' 0
+        }
+        if ($DeferWindowsUpdates.IsChecked) {
+            $windowsUpdate = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
+            Set-CustomizationDword $windowsUpdate 'DeferFeatureUpdates' 1
+            Set-CustomizationDword $windowsUpdate 'DeferFeatureUpdatesPeriodInDays' 365
+            Set-CustomizationDword $windowsUpdate 'DeferQualityUpdates' 1
+            Set-CustomizationDword $windowsUpdate 'DeferQualityUpdatesPeriodInDays' 4
+            Set-CustomizationDword $windowsUpdate 'EnableOptionalUpdates' 0
+        }
+        if ($VerboseLogonStatus.IsChecked) {
+            Set-CustomizationDword 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' 'VerboseStatus' 1
+        }
+
+        if ($DisableAdvertisingId.IsChecked) {
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo' 'Enabled' 0
+        }
+        if ($DisableTailoredExperiences.IsChecked) {
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Privacy' 'TailoredExperiencesWithDiagnosticDataEnabled' 0
+        }
+        if ($DisableOnlineSpeechRecognition.IsChecked) {
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy' 'HasAccepted' 0
+        }
+        if ($DisableInputPersonalization.IsChecked) {
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\Input\TIPC' 'Enabled' 0
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\InputPersonalization' 'RestrictImplicitInkCollection' 1
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\InputPersonalization' 'RestrictImplicitTextCollection' 1
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\InputPersonalization\TrainedDataStore' 'HarvestContacts' 0
+            Set-CustomizationDword 'HKCU:\Software\Microsoft\Personalization\Settings' 'AcceptedPrivacyPolicy' 0
+        }
+        if ($DisableWindowsTelemetry.IsChecked) {
+            Set-CustomizationDword 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection' 'AllowTelemetry' 0
+        }
+        if ($DisableActivityPublishing.IsChecked) {
+            Set-CustomizationDword 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' 'PublishUserActivities' 0
+        }
+        if ($DisableStartAppTracking.IsChecked) {
+            Set-CustomizationDword $advanced 'Start_TrackProgs' 0
+        }
+        if ($DisableFeedbackRequests.IsChecked) {
+            $feedbackPolicy = 'HKCU:\Software\Microsoft\Siuf\Rules'
+            Set-CustomizationDword $feedbackPolicy 'NumberOfSIUFInPeriod' 0
+            if (Test-Path -LiteralPath $feedbackPolicy) {
+                $feedbackProperties = Get-ItemProperty -LiteralPath $feedbackPolicy
+                if ($feedbackProperties.PSObject.Properties.Name -contains 'PeriodInNanoSeconds') {
+                    Remove-ItemProperty -LiteralPath $feedbackPolicy -Name 'PeriodInNanoSeconds'
+                }
+            }
+        }
+        if ($DisablePowerShellTelemetry.IsChecked) {
+            [Environment]::SetEnvironmentVariable('POWERSHELL_TELEMETRY_OPTOUT', '1', 'Machine')
+            $env:POWERSHELL_TELEMETRY_OPTOUT = '1'
+        }
+
         if ($SetCursor.IsChecked) {
             $cursorScript = Join-Path $script:Root 'set-cursor.ps1'
             if (-not (Test-Path -LiteralPath $cursorScript)) {
