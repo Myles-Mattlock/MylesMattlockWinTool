@@ -232,7 +232,7 @@ $script:AppVersion = '1.0.0'
                     <StackPanel>
                         <TextBlock Text="Windows Preferences" Foreground="#00A8E8" FontWeight="Bold" FontSize="12" Margin="0,0,0,14"/>
                         <CheckBox x:Name="ShowFileExtensions" Content="Show file extensions" IsChecked="True"/>
-                        <CheckBox x:Name="ShowTaskView" Content="Show Task View button" IsChecked="True"/>
+                        <CheckBox x:Name="DisableTaskView" Content="Disable Task View button" IsChecked="True"/>
                         <CheckBox x:Name="HideRecommended" Content="Hide Recommended section in Start" IsChecked="True"/>
                         <CheckBox x:Name="DarkMode" Content="Use dark mode" IsChecked="True"/>
                         <CheckBox x:Name="DefenderPua" Content="Enable potentially unwanted app protection" IsChecked="True"/>
@@ -333,7 +333,7 @@ $script:AppVersion = '1.0.0'
 
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
-@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InfoTabButton','InstallTabButton','CustomizationTabButton','CleanupTabButton','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','ShowTaskView','HideRecommended','DarkMode','DefenderPua','SetCursor','OpenThisPc','FileSelectionCheckboxes','TaskbarEndTask','DisableBingSearch','ShowAllAppsList','RemoveStartMenuMoreProgramsLimit','DisableDeliveryOptimizationPeers','DeferWindowsUpdates','VerboseLogonStatus','DisableAdvertisingId','DisableTailoredExperiences','DisableOnlineSpeechRecognition','DisableInputPersonalization','DisableWindowsTelemetry','DisableActivityPublishing','DisableStartAppTracking','DisableFeedbackRequests','DisablePowerShellTelemetry','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
+@('HeaderVersion','HeaderLogo','InfoWindowsVersion','InfoWindowsLoading','InfoDriveStatus','InfoDriveLoading','InfoTabButton','InstallTabButton','CustomizationTabButton','CleanupTabButton','MainTabs','InstallTab','InstallPowerShell','InstallOperaGx','InstallChrome','InstallFirefox','InstallDocker','InstallGithubDesktop','InstallTeams','InstallJabra','Install7zip','InstallVscode','InstallHwmonitor','InstallNotepadPlus','InstallPostman','InstallGit','InstallWsl','InstallPowertoys','ShowFileExtensions','DisableTaskView','HideRecommended','DarkMode','DefenderPua','SetCursor','OpenThisPc','FileSelectionCheckboxes','TaskbarEndTask','DisableBingSearch','ShowAllAppsList','RemoveStartMenuMoreProgramsLimit','DisableDeliveryOptimizationPeers','DeferWindowsUpdates','VerboseLogonStatus','DisableAdvertisingId','DisableTailoredExperiences','DisableOnlineSpeechRecognition','DisableInputPersonalization','DisableWindowsTelemetry','DisableActivityPublishing','DisableStartAppTracking','DisableFeedbackRequests','DisablePowerShellTelemetry','InstallSelected','UninstallSelected','ApplyCustomization','KeepTeams','RunDebloat','DefaultProfile','ServerProfile','CustomProfile','CleanupTemp','CleanupRecycle','CleanupCleanmgr','CleanupDns','CleanupDism','CleanupStatus','CleanupProgress','CleanupProgressPercent','StartCleanup','Log','LogScroll') | ForEach-Object {
     Set-Variable -Name $_ -Value $window.FindName($_)
 }
 
@@ -704,7 +704,7 @@ $ApplyCustomization.Add_Click({
     try {
         $advanced = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
         Set-ItemProperty -Path $advanced -Name HideFileExt -Value ([int](-not $ShowFileExtensions.IsChecked))
-        Set-ItemProperty -Path $advanced -Name ShowTaskViewButton -Value ([int]$ShowTaskView.IsChecked)
+        Set-ItemProperty -Path $advanced -Name ShowTaskViewButton -Value ([int](-not $DisableTaskView.IsChecked))
         $recommended = 'HKCU:\SOFTWARE\Policies\Microsoft\Windows\Explorer'
         New-Item -Path $recommended -Force | Out-Null
         Set-ItemProperty -Path $recommended -Name HideRecommendedSection -Value ([int]$HideRecommended.IsChecked)
