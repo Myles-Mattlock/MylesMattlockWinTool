@@ -1,4 +1,4 @@
-name: Build and Package Windows Installer
+name: Build and Release PowerShell WinTool
 
 on:
   push:
@@ -10,81 +10,93 @@ on:
   workflow_dispatch:
 
 jobs:
-  windows_installer_build:
-    name: Build Windows Installer
-    runs-on: windows-2025-vs2026
+  build:
+    name: Package PowerShell WinTool
+    runs-on: windows-2025
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v6.0.2
 
-    - name: Install ps2exe module
-      run: |
-        Install-Module -Name ps2exe -Force -Scope CurrentUser
+    - name: Create runtime package
       shell: pwsh
-
-    - name: Prepare Staging and Build Executables
       run: |
-        # 1. Create the package folder
-        New-Item -ItemType Directory -Force -Path "ZipStage\windowsinstaller"
-        
-        # 2. Compile the main tool. Runtime dependencies must be beside the
-        # executable because the script resolves them from its own directory.
-        # WingetUserHelper.ps1 remains beside the executable because the tool
-        # launches it with PowerShell when installing or removing applications.
-        ps2exe -InputFile MylesMattlockWinTool.ps1 -OutputFile 'ZipStage\windowsinstaller\MylesMattlockWinTool.exe' -IconFile MM.ico -version '1.0.0'
-        
-        # 3. Copy runtime files beside the executable. This excludes build-only
-        # files and the source entry point, while retaining helper scripts and
-        # resource folders such as SystemCleanUp.
-        Get-ChildItem -Exclude "ZipStage", ".git", ".github", ".gitignore", "elevate.manifest.xml", "InstallApplications.ps1", "Installer.ps1", "MylesMattlockWinTool.ps1", "set-execution-policy.reg", "ToDo", "UpdatePolicy.ps1", "README.md", "MM.ico" |
-          Copy-Item -Destination "ZipStage\windowsinstaller" -Recurse -Force
-      shell: pwsh
+        $stagePath = Join-Path $PWD 'WinTool'
+        New-Item -ItemType Directory -Path $stagePath -Force | Out-Null
+        $excludedFiles = @(
+          '.git',
+          '.github',
+          '.gitignore',
+          'build',
+          'BuildLocal.ps1',
+          'elevate.manifest.xml',
+          'Installer.ps1',
+          'Invoke-MylesMattlockWinTool.ps1',
+          'MM.ico',
+          'README.md',
+          'set-execution-policy.reg',
+          'ToDo',
+          'UpdatePolicy.ps1',
+          'WinTool'
+        )
+        Get-ChildItem -LiteralPath $PWD -Force |
+          Where-Object { $_.Name -notin $excludedFiles } |
+          ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination $stagePath -Recurse -Force
+          }
+        if (-not (Test-Path -LiteralPath (Join-Path $stagePath 'MylesMattlockWinTool.ps1'))) {
+          throw 'The runtime package does not contain MylesMattlockWinTool.ps1.'
+        }
+        Compress-Archive -Path (Join-Path $stagePath '*') -DestinationPath (Join-Path $PWD 'WinTool.zip') -Force
+        $releaseTag = if ($env:GITHUB_REF -eq 'refs/heads/dev') {
+          'beta-latest'
+        } elseif ($env:GITHUB_REF -eq 'refs/heads/main') {
+          'prod-latest'
+        } else {
+          $env:GITHUB_REF_NAME
+        }
+        if ($releaseTag -notmatch '^[A-Za-z0-9._-]+$') {
+          throw "Invalid release tag for launcher: $releaseTag"
+        }
+        $launcherPath = Join-Path $PWD 'Invoke-MylesMattlockWinTool.ps1'
+        $launcherSource = [System.IO.File]::ReadAllText($launcherPath)
+        $channelSetting = "`$env:MYLES_WINTOOL_RELEASE_TAG = '$releaseTag'`r`n"
+        [System.IO.File]::WriteAllText(
+          $launcherPath,
+          $channelSetting + $launcherSource,
+          [System.Text.UTF8Encoding]::new($false)
+        )
 
-    - name: Embed Admin Manifests (mt.exe)
-      run: |
-        $mtPath = Get-ChildItem "C:\Program Files (x86)\Windows Kits\*\bin\*\x64\mt.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
-        if (-not $mtPath) { throw "mt.exe not found" }
-        
-        # Apply the administrator manifest to the newly compiled tool.
-        & $mtPath -manifest elevate.manifest.xml -outputresource:"ZipStage\windowsinstaller\MylesMattlockWinTool.exe";#1
-        
-        # If setup.exe also needs admin rights, uncomment the line below:
-        # & $mtPath -manifest elevate.manifest.xml -outputresource:"ZipStage\windowsinstaller\setup.exe";#1
-      shell: pwsh
-
-    - name: Create Windows Installer ZIP
-      run: |
-        # We zip the contents of ZipStage so 'windowsinstaller' is the top-level folder
-        Compress-Archive -Path "ZipStage\windowsinstaller" -DestinationPath "WindowsInstaller.zip"
-      shell: pwsh
-
-    - name: Upload Artifact
+    - name: Upload release assets
       uses: actions/upload-artifact@v7.0.1
       with:
-        name: WindowsInstaller-Package
-        path: WindowsInstaller.zip
+        name: MylesMattlockWinTool-Release
+        path: |
+          WinTool.zip
+          Invoke-MylesMattlockWinTool.ps1
 
-  create_release:
-    name: Create Release
-    needs: windows_installer_build
-    if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: github.ref_type == 'tag' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-    - name: Download Artifact
+    - name: Download release assets
       uses: actions/download-artifact@v8.0.1
       with:
-        name: WindowsInstaller-Package
+        name: MylesMattlockWinTool-Release
 
-    - name: Create Release
+    - name: Publish release assets
       uses: softprops/action-gh-release@v3.0.2
       with:
-        tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'beta-latest' }}
-        files: WindowsInstaller.zip
+        tag_name: ${{ github.ref == 'refs/heads/dev' && 'beta-latest' || github.ref == 'refs/heads/main' && 'prod-latest' || github.ref_name }}
+        files: |
+          WinTool.zip
+          Invoke-MylesMattlockWinTool.ps1
         draft: false
-        prerelease: ${{ github.ref == 'refs/heads/main' || contains(github.ref_name, '-') }}
+        prerelease: ${{ github.ref == 'refs/heads/dev' || contains(github.ref_name, '-') }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
